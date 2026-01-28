@@ -184,9 +184,6 @@
       statusEl.textContent = "Không thể khởi chạy";
     }
 
-    const MAX_DPR = 1.25; // try 1.0 (fastest), 1.25 (nice), 1.5 (sharper but heavier)
-    const DPR = Math.min(window.devicePixelRatio || 1, MAX_DPR);
-
     createUnityInstance(canvas, {
       arguments: [],
       dataUrl: "Build/3DMapBuild.data",
@@ -197,9 +194,6 @@
       productName: "demo",
       productVersion: "0.1.0",
       matchWebGLToCanvasSize: true,
-
-      // ✅ This is the key line:
-      devicePixelRatio: DPR,
     }, (progress) => setProgress(progress))
     .then(() => {
       setProgress(1);
