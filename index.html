@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, viewport-fit=cover" />
+  <title>Unity WebGL | demo</title>
+
+  <style>
+    :root{
+      /* Safe area (notch) support */
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #ffffff;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: #111;
+    }
+
+    #unity-canvas {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      background: #ffffff;
+      touch-action: none;
+    }
+
+    /* Fullscreen loader */
+    #loader {
+      position: fixed;
+      inset: 0;
+      /* Use dynamic viewport units for mobile browser UI */
+      min-height: 100dvh;
+      width: 100%;
+      display: grid;
+      place-items: center;
+      background: #ffffff;
+      z-index: 10;
+
+      /* Responsive padding + safe areas */
+      padding:
+        calc(clamp(12px, 3vw, 28px) + var(--safe-top))
+        calc(clamp(12px, 3vw, 28px) + var(--safe-right))
+        calc(clamp(12px, 3vw, 28px) + var(--safe-bottom))
+        calc(clamp(12px, 3vw, 28px) + var(--safe-left));
+      box-sizing: border-box;
+    }
+
+    #card {
+      width: min(560px, 100%);
+      max-width: 92vw;
+      max-height: calc(100dvh - 2 * clamp(12px, 3vw, 28px) - var(--safe-top) - var(--safe-bottom));
+      overflow: auto;
+
+      border-radius: clamp(14px, 2.2vw, 18px);
+      border: 1px solid rgba(0,0,0,0.08);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.08);
+      background: #fff;
+
+      padding: clamp(16px, 3.2vw, 22px);
+      box-sizing: border-box;
+    }
+
+    #title {
+      margin: 0;
+      font-size: clamp(16px, 2.2vw, 18px);
+      font-weight: 700;
+      color: #111;
+      line-height: 1.2;
+    }
+    
+    #barWrap {
+      margin: clamp(14px, 2.6vw, 16px) 0 clamp(10px, 2.2vw, 12px);
+      height: clamp(10px, 1.6vw, 12px);
+      border-radius: 999px;
+      background: rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+
+    #bar {
+      width: 0%;
+      height: 100%;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.75);
+      transition: width 120ms linear;
+    }
+
+    #row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      font-size: clamp(12px, 1.8vw, 13px);
+      color: rgba(0,0,0,0.65);
+      line-height: 1.35;
+    }
+
+    /* Prevent long text overflow on tiny screens */
+    #status {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #percent {
+      flex: 0 0 auto;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #errorBox {
+      display: none;
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(220, 0, 0, 0.06);
+      border: 1px solid rgba(220, 0, 0, 0.18);
+      font-size: clamp(12px, 1.8vw, 13px);
+      color: rgba(120, 0, 0, 0.9);
+      white-space: pre-wrap;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
+    .hide {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 300ms ease;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="unity-canvas" tabindex="-1"></canvas>
+
+  <div id="loader" role="status" aria-live="polite">
+    <div id="card">
+      <p id="title">Bản đồ 3D Bệnh Viện Nội Tiết</p>
+
+      <div id="barWrap"><div id="bar"></div></div>
+
+      <div id="row">
+        <div id="status">Đang khởi động…</div>
+        <div id="percent">0%</div>
+      </div>
+
+      <div id="errorBox"></div>
+    </div>
+  </div>
+
+  <script src="Build/3DMapBuild.loader.js"></script>
+  <script>
+    const canvas = document.querySelector("#unity-canvas");
+
+    const loader = document.getElementById("loader");
+    const bar = document.getElementById("bar");
+    const statusEl = document.getElementById("status");
+    const percentEl = document.getElementById("percent");
+    const errorBox = document.getElementById("errorBox");
+
+    function setProgress(p) {
+      const clamped = Math.max(0, Math.min(1, p));
+      const pct = Math.round(clamped * 100);
+      bar.style.width = pct + "%";
+      percentEl.textContent = pct + "%";
+
+      if (pct < 20) statusEl.textContent = "Đang tải xuống…";
+      else if (pct < 70) statusEl.textContent = "Đang giải nén…";
+      else if (pct < 95) statusEl.textContent = "Đang khởi tạo…";
+      else statusEl.textContent = "Sắp xong…";
+    }
+
+    function showError(message) {
+      errorBox.style.display = "block";
+      errorBox.textContent = message;
+      statusEl.textContent = "Không thể khởi chạy";
+    }
+
+    createUnityInstance(canvas, {
+      arguments: [],
+      dataUrl: "Build/3DMapBuild.data",
+      frameworkUrl: "Build/3DMapBuild.framework.js",
+      codeUrl: "Build/3DMapBuild.wasm",
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "DefaultCompany",
+      productName: "demo",
+      productVersion: "0.1.0",
+      matchWebGLToCanvasSize: true,
+      // devicePixelRatio: 1,
+    }, (progress) => setProgress(progress))
+    .then(() => {
+      setProgress(1);
+      statusEl.textContent = "Sẵn sàng";
+      loader.classList.add("hide");
+      setTimeout(() => loader.remove(), 350);
+    })
+    .catch((message) => {
+      showError(String(message));
+      console.error(message);
+    });
+  </script>
+</body>
+</html>
